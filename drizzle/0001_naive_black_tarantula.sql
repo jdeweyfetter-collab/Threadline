@@ -1,0 +1,1 @@
+ALTER TABLE `garments` ADD `scope` text DEFAULT 'canonical' NOT NULL;

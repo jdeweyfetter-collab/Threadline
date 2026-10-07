@@ -1,0 +1,23 @@
+'use client';
+import {useEffect,useRef,useState} from 'react';
+import ProfileScreen from './profile-screen';
+import ClosetApp from '@/components/closet/closet-app';
+import type {Account} from '@/lib/account';
+type Identity=Account;
+async function send(body:unknown){const r=await fetch('/api/account',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});const value:any=await r.json();if(!r.ok)throw Error(value.error||'Please try again.');return value}
+function announce(){localStorage.setItem('threadling-account-change',String(Date.now()))}
+export default function AccountGate(){
+ const loadGeneration=useRef(0);
+ const [identity,setIdentity]=useState<Identity|null>(null),[checking,setChecking]=useState(true),[accountOpen,setAccountOpen]=useState(false),[error,setError]=useState('');
+ async function load(background=false){const generation=++loadGeneration.current;if(!background)setChecking(true);setError('');try{const r=await fetch('/api/account',{cache:'no-store'});if(generation!==loadGeneration.current)return;if(r.status===401){setIdentity(null);return}const d:any=await r.json();if(!r.ok)throw Error(d.error);if(generation===loadGeneration.current)setIdentity(d)}catch(e){if(generation===loadGeneration.current){setIdentity(null);setError((e as Error).message)}}finally{if(generation===loadGeneration.current)setChecking(false)}}
+ useEffect(()=>{if(location.hash.includes('access_token=')||location.hash.includes('error_description='))history.replaceState(null,'',location.pathname);load();const change=()=>load(true);const storage=(e:StorageEvent)=>{if(e.key==='threadling-account-change')load()};addEventListener('focus',change);addEventListener('storage',storage);const visibility=()=>{if(document.visibilityState==='visible')load(true)};document.addEventListener('visibilitychange',visibility);return()=>{removeEventListener('focus',change);removeEventListener('storage',storage);document.removeEventListener('visibilitychange',visibility)}},[]);
+ if(!checking&&identity&&!accountOpen&&identity.id)return <ClosetApp key={identity.id} account={identity} onAccount={()=>setAccountOpen(true)}/>;
+ return <div className="tl-app"><header className="tl-header"><a href="/" className="tl-wordmark">threadling<span>your wardrobe, considered.</span></a>{identity&&<button className="tl-link" onClick={async()=>{loadGeneration.current++;setChecking(true);try{await send({action:'signout'});announce();setIdentity(null);setAccountOpen(false);location.hash=''}catch(e){setError((e as Error).message)}finally{setChecking(false)}}}>Sign out</button>}</header><main className="tl-account">
+ {checking?<p role="status">Opening your wardrobe…</p>:error?<div role="alert"><p className="tl-error">{error}</p><button className="tl-button" onClick={()=>load()}>Retry</button></div>:identity?<ProfileScreen key={identity.id} account={identity} onClose={()=>setAccountOpen(false)}/>:<AuthForm onSignedIn={async()=>{announce();await load()}}/>}
+ </main></div>
+}
+function AuthForm({onSignedIn}:{onSignedIn:()=>Promise<void>}){
+ const [signup,setSignup]=useState(false),[email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState(''),[message,setMessage]=useState('');
+ return <><p className="tl-kicker">A space of your own.</p><h1>{signup?'Make room for your wardrobe.':'Welcome to Threadling.'}</h1><p className="tl-hint">Your clothes, their stories, and every wear. Your closet stays private.</p><form onSubmit={async e=>{e.preventDefault();setBusy(true);setError('');setMessage('');try{const d=await send({action:signup?'signup':'signin',email,password});setPassword('');if(d.confirmationRequired){setMessage(d.message);setSignup(false)}else await onSignedIn()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}}>
+ <label className="tl-field"><span>Email</span><input type="email" autoComplete="email" required maxLength={254} value={email} onChange={e=>setEmail(e.target.value)}/></label><label className="tl-field"><span>Password</span><input type="password" autoComplete={signup?'new-password':'current-password'} required minLength={8} maxLength={128} value={password} onChange={e=>setPassword(e.target.value)}/>{signup&&<small>At least 8 characters.</small>}</label>{error&&<p className="tl-error" role="alert">{error}</p>}{message&&<p role="status">{message}</p>}<button className="tl-button" disabled={busy}>{busy?'One moment…':signup?'Create account':'Sign in'}</button></form><button className="tl-link" disabled={busy} onClick={()=>{setSignup(!signup);setError('');setMessage('')}}>{signup?'Already have an account? Sign in':'New here? Create an account'}</button></>
+}

@@ -1,0 +1,4 @@
+'use client';
+import {Children,isValidElement,type ReactNode} from 'react';
+import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from '@/components/ui/select';
+export function Choice({value,onChange,children,label}:{value:string;onChange:(event:{target:{value:string}})=>void;children:ReactNode;label?:string}){const opts=Children.toArray(children).flatMap((child):{value:string;text:ReactNode}[]=>{if(!isValidElement<{value?:string;children:ReactNode}>(child))return [];return [{value:child.props.value??String(child.props.children),text:child.props.children}]});return <Select value={value||'__empty'} onValueChange={v=>onChange({target:{value:v==='__empty'?'':v}})}><SelectTrigger aria-label={label}><SelectValue/></SelectTrigger><SelectContent>{opts.map(o=><SelectItem key={o.value} value={o.value||'__empty'}>{o.text}</SelectItem>)}</SelectContent></Select>}
